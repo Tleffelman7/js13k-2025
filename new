@@ -1,0 +1,11 @@
+todo
+
+Generate level
+-need list of words
+create one medium sized level with words- 15x15
+click and drag with mouse-need valid end point
+    Draw transparent line to show word/completion 
+    use there zoom size=as playable
+    cant leave playable area
+5 words to find
+fill gaps with random letters
