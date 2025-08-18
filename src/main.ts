@@ -5,6 +5,7 @@ import { gridSize, gridCellSize } from "./constants.ts";
 import { canvas } from "./dom.ts";
 import { update, draw } from "./game.ts";
 
+let prevTime = performance.now();
 function raf() {
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("no ctx");
@@ -25,7 +26,12 @@ function raf() {
   };
   state.wordSearchGrid = wordSearchGrid;
 
-  update();
+  {
+    const now = performance.now();
+    const dt = now - prevTime;
+    prevTime = now;
+    update(dt);
+  }
   draw(ctx);
 
   requestAnimationFrame(raf);

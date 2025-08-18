@@ -1,22 +1,19 @@
 import { state, reset } from "./state";
-import {
-  gridCellSize,
-  gridSize,
-  catBulletConstants,
-  catBulletSpeedSpawnHz,
-} from "./constants";
-let prevTime = performance.now();
-export function update() {
-  const now = performance.now();
-  const dt = now - prevTime;
-  prevTime = now;
+import { gridCellSize, gridSize, catBulletConstants } from "./constants";
 
+export function update(dt: number) {
+  const gameOver =
+    state.wordsToFind.length === 0 || state.playerAlive === false;
+  if (gameOver && state.mouse.leftButtonDown === true) {
+    reset();
+  }
   const mouseOverGridX =
     state.mouse.x >= state.wordSearchGrid.x &&
     state.mouse.x <= state.wordSearchGrid.x + state.wordSearchGrid.width;
   const mouseOverGridY =
     state.mouse.y >= state.wordSearchGrid.y &&
     state.mouse.y <= state.wordSearchGrid.y + state.wordSearchGrid.height;
+
   if (mouseOverGridX && mouseOverGridY) {
     const gridX = Math.floor(
       (state.mouse.x - state.wordSearchGrid.x) / gridCellSize,
@@ -84,19 +81,17 @@ export function update() {
         state.selection.selecting = false;
       }
     }
+
+    const gameOver =
+      state.wordsToFind.length === 0 || state.playerAlive === false;
+    if (gameOver && state.mouse.leftButtonDown === true) {
+      reset();
+    }
   }
-  const bulletTouchesMouse = state.catBullets.some((bullet) => {
-    const dx = bullet.x - state.mouse.x;
-    const dy = bullet.y - state.mouse.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-    return distance < catBulletConstants.radius;
-  });
-  if (bulletTouchesMouse) {
-    state.playerAlive = false;
-  }
+
   state.catBulletSpawnTimer += dt;
-  const timePerCatBullet = 500 / catBulletSpeedSpawnHz;
-  if (state.catBulletSpawnTimer >= timePerCatBullet && state.playerAlive) {
+  const timePerCatBullet = 500 / catBulletConstants.spawnHz;
+  while (state.catBulletSpawnTimer >= timePerCatBullet && state.playerAlive) {
     state.catBullets.push({
       x:
         Math.round(Math.random()) * state.wordSearchGrid.width +
@@ -108,29 +103,34 @@ export function update() {
     });
     state.catBulletSpawnTimer -= timePerCatBullet;
   }
+
   state.catBullets.forEach((bullet) => {
-    if (
+    const bulletOffScreen =
       bullet.x < state.wordSearchGrid.x ||
       bullet.x > state.wordSearchGrid.x + state.wordSearchGrid.width ||
       bullet.y < state.wordSearchGrid.y ||
-      bullet.y > state.wordSearchGrid.y + state.wordSearchGrid.height
-    ) {
+      bullet.y > state.wordSearchGrid.y + state.wordSearchGrid.height;
+    if (bulletOffScreen) {
       state.catBullets.splice(state.catBullets.indexOf(bullet), 1);
     }
   });
 
-  //move bullet along a random angle
   state.catBullets.forEach((bullet) => {
-    bullet.x += Math.cos(bullet.angle) * catBulletConstants.speed;
-    bullet.y += Math.sin(bullet.angle) * catBulletConstants.speed;
+    bullet.x +=
+      (Math.cos(bullet.angle) * catBulletConstants.speed * dt) / (1000 / 60);
+    bullet.y +=
+      (Math.sin(bullet.angle) * catBulletConstants.speed * dt) / (1000 / 60);
   });
 
-  // if bullet.x is 0, bullet.y can be a random value between 0 and the height of the grid
-  state.catBullets.forEach((bullet) => {
-    if (bullet.x === 0) {
-      bullet.y = Math.random() * state.wordSearchGrid.height;
-    }
+  const bulletTouchesMouse = state.catBullets.some((bullet) => {
+    const dx = bullet.x - state.mouse.x;
+    const dy = bullet.y - state.mouse.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    return distance < catBulletConstants.radius;
   });
+  if (bulletTouchesMouse) {
+    state.playerAlive = false;
+  }
 }
 
 export function draw(ctx: CanvasRenderingContext2D) {
@@ -266,12 +266,6 @@ export function draw(ctx: CanvasRenderingContext2D) {
     );
   }
   if (state.playerAlive === false) {
-    ctx.createLinearGradient(
-      state.canvasRect.width / 2,
-      state.canvasRect.height / 2,
-      state.canvasRect.width / 2,
-      state.canvasRect.height / 2 + 50,
-    );
     ctx.fillStyle = "white";
     ctx.fillRect(0, 0, state.canvasRect.width, state.canvasRect.height);
 
@@ -284,12 +278,5 @@ export function draw(ctx: CanvasRenderingContext2D) {
       state.canvasRect.width / 2,
       state.canvasRect.height / 2,
     );
-  }
-
-  if (
-    (state.wordsToFind.length === 0 || state.playerAlive === false) &&
-    state.mouse.leftButtonDown === true
-  ) {
-    reset();
   }
 }
