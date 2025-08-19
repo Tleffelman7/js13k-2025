@@ -2,8 +2,6 @@ import { canvas } from "./dom.ts";
 import { state } from "./state.ts";
 
 canvas.onmousemove = (e) => {
-  const canvasRect = canvas.getBoundingClientRect();
-
   if (state.playerAlive) {
     if (document.pointerLockElement === canvas) {
       const dx = e.movementX;
