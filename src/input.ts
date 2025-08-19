@@ -4,15 +4,17 @@ import { state } from "./state.ts";
 canvas.onmousemove = (e) => {
   const canvasRect = canvas.getBoundingClientRect();
 
-  if (document.pointerLockElement === canvas) {
-    const dx = e.movementX;
-    const dy = e.movementY;
-    state.mouse.x += dx;
-    state.mouse.y += dy;
-    // use dx, dy to rotate camera
-  } else {
-    state.mouse.x = e.clientX;
-    state.mouse.y = e.clientY;
+  if (state.playerAlive) {
+    if (document.pointerLockElement === canvas) {
+      const dx = e.movementX;
+      const dy = e.movementY;
+      state.mouse.x += dx;
+      state.mouse.y += dy;
+      // use dx, dy to rotate camera
+    } else {
+      state.mouse.x = e.clientX;
+      state.mouse.y = e.clientY;
+    }
   }
 };
 

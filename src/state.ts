@@ -1,4 +1,5 @@
 import { generateWordSearch } from "./word-search";
+import * as Particles from "./particles";
 
 const wordSearchResult = generateWordSearch();
 const initState = {
@@ -32,6 +33,10 @@ const initState = {
     y: number;
     angle: number;
   }[],
+
+  shakeAmount: 0,
+
+  particles: Particles.create()
 };
 
 function createRect() {
