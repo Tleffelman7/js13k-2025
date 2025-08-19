@@ -21,19 +21,10 @@ const initState = {
     end: { x: number; y: number };
   }[],
 
-  canvasRect: {
-    width: 0,
-    height: 0,
-    x: 0,
-    y: 0,
-  },
-
-  wordSearchGrid: {
-    width: 0,
-    height: 0,
-    x: 0,
-    y: 0,
-  },
+  canvasRect: createRect(),
+  wordSearchGrid: createRect(),
+  enemySpawnPerimeter: createRect(),
+  enemyActiveArea: createRect(),
 
   catBulletSpawnTimer: 0,
   catBullets: [] as {
@@ -43,13 +34,22 @@ const initState = {
   }[],
 };
 
+function createRect() {
+  return {
+    width: 0,
+    height: 0,
+    x: 0,
+    y: 0,
+  };
+}
+
 export let state = structuredClone(initState);
 
-// TEST BULLET
-
 export function reset() {
+  const oldMouse = state.mouse;
   state = structuredClone(initState);
   const { grid: newGrid, wordsUsed: newWordsUsed } = generateWordSearch();
   state.grid = newGrid;
   state.wordsToFind = newWordsUsed;
+  state.mouse = oldMouse;
 }

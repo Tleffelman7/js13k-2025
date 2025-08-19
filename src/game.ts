@@ -1,12 +1,48 @@
 import { state, reset } from "./state";
 import { gridCellSize, gridSize, catBulletConstants } from "./constants";
 
-export function update(dt: number) {
+const HITBOX_DEBUG = false
+
+export function update(dt: number, canvasRect: DOMRect) {
   const gameOver =
     state.wordsToFind.length === 0 || state.playerAlive === false;
   if (gameOver && state.mouse.leftButtonDown === true) {
     reset();
   }
+  if (!state.playerAlive) {
+    return
+  }
+
+  const wordSearchWidth = gridSize * gridCellSize;
+  const wordSearchHeight = wordSearchWidth;
+  const wordSearchGrid = {
+    width: wordSearchWidth,
+    height: wordSearchHeight,
+    x: (canvasRect.width - wordSearchWidth) / 2,
+    y: (canvasRect.height - wordSearchHeight) / 2,
+  };
+  state.wordSearchGrid = wordSearchGrid;
+
+  const enemySpawnPerimeterWidth = wordSearchWidth * 1.5;
+  const enemySpawnPerimeterHeight = wordSearchHeight * 1.5;
+  const enemySpawnPerimeter = {
+    width: enemySpawnPerimeterWidth,
+    height: enemySpawnPerimeterHeight,
+    x: (canvasRect.width - enemySpawnPerimeterWidth) / 2,
+    y: (canvasRect.height - enemySpawnPerimeterHeight) / 2,
+  };
+  state.enemySpawnPerimeter = enemySpawnPerimeter;
+
+  const enemyActiveAreaWidth = enemySpawnPerimeterWidth + catBulletConstants.radius * 2;
+  const enemyActiveAreaHeight = enemySpawnPerimeterHeight + catBulletConstants.radius * 2;
+  const enemyActiveArea = {
+    width: enemyActiveAreaWidth,
+    height: enemyActiveAreaHeight,
+    x: (canvasRect.width - enemyActiveAreaWidth) / 2,
+    y: (canvasRect.height - enemyActiveAreaHeight) / 2,
+  };
+  state.enemyActiveArea = enemyActiveArea;
+
   const mouseOverGridX =
     state.mouse.x >= state.wordSearchGrid.x &&
     state.mouse.x <= state.wordSearchGrid.x + state.wordSearchGrid.width;
@@ -81,36 +117,50 @@ export function update(dt: number) {
         state.selection.selecting = false;
       }
     }
-
-    const gameOver =
-      state.wordsToFind.length === 0 || state.playerAlive === false;
-    if (gameOver && state.mouse.leftButtonDown === true) {
-      reset();
-    }
   }
 
   state.catBulletSpawnTimer += dt;
   const timePerCatBullet = 500 / catBulletConstants.spawnHz;
   while (state.catBulletSpawnTimer >= timePerCatBullet && state.playerAlive) {
+    let xAxis = Math.random() > .5
+    let spawnX = 0
+    let spawnY = 0
+    if (xAxis) {
+      spawnX =
+        Math.random() * state.enemyActiveArea.width +
+        state.enemyActiveArea.x
+      spawnY =
+        Math.round(Math.random()) * state.enemyActiveArea.height +
+        state.enemyActiveArea.y
+    } else {
+      spawnX =
+        Math.round(Math.random()) * state.enemyActiveArea.width +
+        state.enemyActiveArea.x
+      spawnY =
+        Math.random() * state.enemyActiveArea.height +
+        state.enemyActiveArea.y
+    }
+    const angleToCenter =
+      Math.atan2(
+        canvasRect.height / 2 - spawnY,
+        canvasRect.width / 2 - spawnX,
+      );
+
+    const offsetAmount = Math.PI / 8;
     state.catBullets.push({
-      x:
-        Math.round(Math.random()) * state.wordSearchGrid.width +
-        state.wordSearchGrid.x,
-      y:
-        Math.round(Math.random()) * state.wordSearchGrid.height +
-        state.wordSearchGrid.y,
-      angle: Math.random() * Math.PI * 2,
+      x: spawnX, y: spawnY,
+      angle: angleToCenter + ((Math.random() - .5) * 2) * offsetAmount,
     });
     state.catBulletSpawnTimer -= timePerCatBullet;
   }
 
   state.catBullets.forEach((bullet) => {
-    const bulletOffScreen =
-      bullet.x < state.wordSearchGrid.x ||
-      bullet.x > state.wordSearchGrid.x + state.wordSearchGrid.width ||
-      bullet.y < state.wordSearchGrid.y ||
-      bullet.y > state.wordSearchGrid.y + state.wordSearchGrid.height;
-    if (bulletOffScreen) {
+    const bulletOutOfActiveArea =
+      bullet.x < state.enemyActiveArea.x ||
+      bullet.x > state.enemyActiveArea.x + state.enemyActiveArea.width ||
+      bullet.y < state.enemyActiveArea.y ||
+      bullet.y > state.enemyActiveArea.y + state.enemyActiveArea.height;
+    if (bulletOutOfActiveArea) {
       state.catBullets.splice(state.catBullets.indexOf(bullet), 1);
     }
   });
@@ -131,30 +181,49 @@ export function update(dt: number) {
   if (bulletTouchesMouse) {
     state.playerAlive = false;
   }
+
+  // clamp mouse
+  state.mouse.x = Math.max(
+    state.enemySpawnPerimeter.x,
+    Math.min(
+      state.mouse.x,
+      state.enemySpawnPerimeter.x + state.enemySpawnPerimeter.width,
+    ),
+  );
+  state.mouse.y = Math.max(
+    state.enemySpawnPerimeter.y,
+    Math.min(
+      state.mouse.y,
+      state.enemySpawnPerimeter.y + state.enemySpawnPerimeter.height,
+    ),
+  );
 }
 
 export function draw(ctx: CanvasRenderingContext2D) {
-  const fontSize = 15;
+  const textColor = "gold"
+
+  const fontSize = .75 * gridCellSize;
   const font = "Arial";
   ctx.font = fontSize + "px " + font;
 
-  ctx.fillStyle = "white";
+  const backgroundColor = "#6F4E37"
+  ctx.fillStyle = backgroundColor;
   ctx.fillRect(0, 0, state.canvasRect.width, state.canvasRect.height);
 
-  ctx.strokeStyle = "black";
+  ctx.strokeStyle = textColor;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillStyle = "black";
+  ctx.fillStyle = textColor;
   for (let x = 0; x < gridSize; x++) {
     for (let y = 0; y < gridSize; y++) {
       const xPos = x * gridCellSize;
       const yPos = y * gridCellSize;
-      ctx.strokeRect(
-        xPos + state.wordSearchGrid.x,
-        yPos + state.wordSearchGrid.y,
-        gridCellSize,
-        gridCellSize,
-      );
+      // ctx.strokeRect(
+      //   xPos + state.wordSearchGrid.x,
+      //   yPos + state.wordSearchGrid.y,
+      //   gridCellSize,
+      //   gridCellSize,
+      // );
 
       const letter = state.grid[y][x];
       ctx.fillText(
@@ -164,6 +233,15 @@ export function draw(ctx: CanvasRenderingContext2D) {
       );
     }
   }
+
+  ctx.lineWidth = 5
+  ctx.strokeStyle = "orange"
+  ctx.strokeRect(
+    state.enemySpawnPerimeter.x,
+    state.enemySpawnPerimeter.y,
+    state.enemySpawnPerimeter.width,
+    state.enemySpawnPerimeter.height,
+  )
 
   // DRAW SELECTION LINE
   const currentlySelectingColor = "blue";
@@ -218,61 +296,105 @@ export function draw(ctx: CanvasRenderingContext2D) {
 
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
-  ctx.fillStyle = "black";
-  const textToPrint = ["WORDS TO FIND:", ...state.wordsToFind];
-  const xMargin = 5;
+  ctx.fillStyle = textColor;
+  const textToPrint = [...state.wordsToFind];
+  const margin = fontSize * .5;
   for (let i = 0; i < textToPrint.length; i++) {
     const word = textToPrint[i];
     ctx.fillText(
       word,
-      state.wordSearchGrid.x + state.wordSearchGrid.width + xMargin,
-      fontSize * i + state.wordSearchGrid.y,
+      margin,
+      fontSize * i + margin,
     );
   }
-  for (let i = 0; i < state.catBullets.length; i++) {
-    const bullet = state.catBullets[i];
-    ctx.fillStyle = "red";
-    if (
-      bullet.x > state.wordSearchGrid.x &&
-      bullet.x < state.wordSearchGrid.x + state.wordSearchGrid.width &&
-      bullet.y > state.wordSearchGrid.y &&
-      bullet.y < state.wordSearchGrid.y + state.wordSearchGrid.height
-    ) {
-      ctx.beginPath();
-      ctx.roundRect(
-        bullet.x,
-        bullet.y,
-        catBulletConstants.radius * 2,
-        catBulletConstants.radius * 2,
-        10,
-      );
-      ctx.fill();
-      ctx.closePath();
+
+
+  ctx.save()
+  ctx.beginPath();
+  ctx.rect(
+    state.enemySpawnPerimeter.x,
+    state.enemySpawnPerimeter.y,
+    state.enemySpawnPerimeter.width,
+    state.enemySpawnPerimeter.height,
+  )
+
+  {
+    ctx.clip();
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = `${catBulletConstants.radius * 3}px ${font}`;
+    state.catBullets.forEach((bullet) => {
+      ctx.save()
+      ctx.translate(bullet.x, bullet.y);
+      ctx.rotate(bullet.angle + Math.PI);
+      ctx.fillText('🐈‍⬛', 0, 0)
+      ctx.restore()
+    })
+    if (HITBOX_DEBUG) {
+      ctx.save()
+      ctx.globalAlpha = 0.5;
+      state.catBullets.forEach((bullet) => {
+        ctx.fillStyle = "red";
+        ctx.beginPath();
+        ctx.arc(
+          bullet.x,
+          bullet.y,
+          catBulletConstants.radius,
+          0,
+          Math.PI * 2,
+        );
+        ctx.fill();
+        ctx.closePath();
+      })
+      ctx.restore()
     }
   }
 
+  // draw cursor
+  // ctx.fillStyle = "purple"
+  // ctx.beginPath();
+  // ctx.arc(
+  //   state.mouse.x,
+  //   state.mouse.y,
+  //   gridCellSize / 2,
+  //   0,
+  //   Math.PI * 2,
+  // );
+  // ctx.fill();
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = `${30}px ${font}`;
+  ctx.fillText(
+    "🐭",
+    state.mouse.x,
+    state.mouse.y,
+  )
+
   if (state.wordsToFind.length === 0) {
-    ctx.fillStyle = "white";
+    ctx.fillStyle = backgroundColor;
     ctx.fillRect(0, 0, state.canvasRect.width, state.canvasRect.height);
 
     ctx.strokeStyle = "black";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillStyle = "black";
+    ctx.fillStyle = textColor;
     ctx.fillText(
       "Congratulations!, Click to play again",
       state.canvasRect.width / 2,
       state.canvasRect.height / 2,
     );
   }
+
   if (state.playerAlive === false) {
-    ctx.fillStyle = "white";
+    ctx.fillStyle = backgroundColor;
+    ctx.globalAlpha = 0.5;
     ctx.fillRect(0, 0, state.canvasRect.width, state.canvasRect.height);
+    ctx.globalAlpha = 1;
 
     ctx.strokeStyle = "black";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillStyle = "black";
+    ctx.fillStyle = textColor;
     ctx.fillText(
       "Game Over!, Click to play again",
       state.canvasRect.width / 2,

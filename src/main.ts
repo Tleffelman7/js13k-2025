@@ -16,21 +16,11 @@ function raf() {
   ctx.scale(devicePixelRatio, devicePixelRatio);
   state.canvasRect = canvasRect;
 
-  const wordSearchWidth = gridSize * gridCellSize;
-  const wordSearchHeight = wordSearchWidth;
-  const wordSearchGrid = {
-    width: wordSearchWidth,
-    height: wordSearchHeight,
-    x: (canvasRect.width - wordSearchWidth) / 2,
-    y: (canvasRect.height - wordSearchHeight) / 2,
-  };
-  state.wordSearchGrid = wordSearchGrid;
-
   {
     const now = performance.now();
     const dt = now - prevTime;
     prevTime = now;
-    update(dt);
+    update(dt, canvasRect);
   }
   draw(ctx);
 
