@@ -6,20 +6,7 @@ import * as Particles from "./particles";
 const HITBOX_DEBUG = false
 
 export function update(dt: number, canvasRect: DOMRect) {
-  // approach screenshake to 0
-  state.shakeAmount = state.shakeAmount * (1.0 - (dt * .005));
-
-  Particles.update(state.particles, dt);
-
-  const gameOver =
-    state.wordsToFind.length === 0 || state.playerAlive === false;
-  if (gameOver && state.mouse.leftButtonDown === true) {
-    reset();
-  }
-  if (!state.playerAlive) {
-    return
-  }
-
+  // rect calculations
   const wordSearchWidth = gridSize * gridCellSize;
   const wordSearchHeight = wordSearchWidth;
   const wordSearchGrid = {
@@ -50,105 +37,123 @@ export function update(dt: number, canvasRect: DOMRect) {
   };
   state.enemyActiveArea = enemyActiveArea;
 
-  const { onGrid: mouseOverGrid, x: gridX, y: gridY } =
+  // approach screenshake to 0
+  state.shakeAmount = state.shakeAmount * (1.0 - (dt * .005));
+
+  Particles.update(state.particles, dt);
+  const gameOver =
+    state.wordsToFind.length === 0 || state.playerAlive === false;
+  if (gameOver && state.mouse.leftButtonDown === true) {
+    reset();
+  }
+  if (gameOver) {
+    return
+  }
+
+  if (!state.gameStarted) {
+    if (state.mouse.leftButtonDown) {
+      state.gameStarted = true;
+    } else {
+      return
+    }
+  }
+
+
+  const { onGrid, x: gridX, y: gridY } =
     gridPos();
 
-  if (mouseOverGrid) {
-    // handle mouse logic
-    if (!state.selection.selecting && state.playerAlive) {
-      if (state.mouse.leftButtonDown) {
-        state.selection.selecting = true;
-        state.selection.start = { x: gridX, y: gridY };
+  // handle mouse logic
+  if (!state.selection.selecting && onGrid) {
+    if (state.mouse.leftButtonDown) {
+      state.selection.selecting = true;
+      state.selection.start = { x: gridX, y: gridY };
+      state.selection.end = { x: gridX, y: gridY };
+    }
+  } else {
+    if (state.mouse.leftButtonDown && onGrid) {
+      const start = state.selection.start;
+      const dx = gridX - start.x;
+      const dy = gridY - start.y;
+      const oneDirection = dx == 0 || dy == 0;
+      const hasSlopeOfOne = Math.abs(dx) === Math.abs(dy);
+      if (oneDirection || hasSlopeOfOne) {
         state.selection.end = { x: gridX, y: gridY };
       }
-    } else {
-      // we are selecting
-      if (state.mouse.leftButtonDown) {
-        const start = state.selection.start;
-        const dx = gridX - start.x;
-        const dy = gridY - start.y;
-        const oneDirection = dx == 0 || dy == 0;
-        const hasSlopeOfOne = Math.abs(dx) === Math.abs(dy);
-        if (oneDirection || hasSlopeOfOne) {
-          state.selection.end = { x: gridX, y: gridY };
-        }
-      } else {
-        {
-          const letters = [] as string[];
-          const dx = Math.sign(state.selection.end.x - state.selection.start.x);
-          const dy = Math.sign(state.selection.end.y - state.selection.start.y);
-          const selectionLength = Math.max(
-            Math.abs(state.selection.end.x - state.selection.start.x),
-            Math.abs(state.selection.end.y - state.selection.start.y),
-          );
-          for (let i = 0; i <= selectionLength; i++) {
-            const x = state.selection.start.x + dx * i;
-            const y = state.selection.start.y + dy * i;
-            if (x < 0 || x >= gridSize || y < 0 || y >= gridSize) {
-              continue; // out of bounds
-            }
-            letters.push(state.grid[y][x]);
-          }
-          const wordForwards = letters.join("");
-          const wordBackwards = letters.reverse().join("");
+    }
+  }
 
-          const foundWord = state.wordsToFind.find(
-            (word) => word === wordForwards || word === wordBackwards,
-          );
-          if (foundWord) {
-            // add to found words
-            state.foundWordLines.push({
-              start: { x: state.selection.start.x, y: state.selection.start.y },
-              end: { x: state.selection.end.x, y: state.selection.end.y },
-            });
-            // remove from words used
-            const index = state.wordsToFind.indexOf(foundWord);
-            if (index > -1) {
-              state.wordsToFind.splice(index, 1);
-            }
-            playWordFoundSound();
+  if (state.selection.selecting && !state.mouse.leftButtonDown) {
+    const letters = [] as string[];
+    const dx = Math.sign(state.selection.end.x - state.selection.start.x);
+    const dy = Math.sign(state.selection.end.y - state.selection.start.y);
+    const selectionLength = Math.max(
+      Math.abs(state.selection.end.x - state.selection.start.x),
+      Math.abs(state.selection.end.y - state.selection.start.y),
+    );
+    for (let i = 0; i <= selectionLength; i++) {
+      const x = state.selection.start.x + dx * i;
+      const y = state.selection.start.y + dy * i;
+      if (x < 0 || x >= gridSize || y < 0 || y >= gridSize) {
+        continue; // out of bounds
+      }
+      letters.push(state.grid[y][x]);
+    }
+    const wordForwards = letters.join("");
+    const wordBackwards = letters.reverse().join("");
 
-            const lineDist =
-              Math.hypot(
-                state.selection.end.x - state.selection.start.x,
-                state.selection.end.y - state.selection.start.y,
-              )
-            const particleAmount = Math.round(lineDist * 4)
-            for (let i = 0; i < particleAmount; i++) {
-              const t = i / particleAmount;
-              const x =
-                state.wordSearchGrid.x +
-                state.selection.start.x * gridCellSize +
-                gridCellSize / 2 +
-                (state.selection.end.x - state.selection.start.x) * t * gridCellSize;
-              const y =
-                state.wordSearchGrid.y +
-                state.selection.start.y * gridCellSize +
-                gridCellSize / 2 +
-                (state.selection.end.y - state.selection.start.y) * t * gridCellSize;
+    const foundWord = state.wordsToFind.find(
+      (word) => word === wordForwards || word === wordBackwards,
+    );
+    if (foundWord) {
+      // add to found words
+      state.foundWordLines.push({
+        start: { x: state.selection.start.x, y: state.selection.start.y },
+        end: { x: state.selection.end.x, y: state.selection.end.y },
+      });
+      // remove from words used
+      const index = state.wordsToFind.indexOf(foundWord);
+      if (index > -1) {
+        state.wordsToFind.splice(index, 1);
+      }
+      playWordFoundSound();
 
-              Particles.addParticle(
-                state.particles,
-                x,
-                y,
-                (Math.random() - 0.5),
-                (Math.random() - 0.5),
-                1000, // lifetime
-              );
-            }
-          }
-        }
-        state.selection.selecting = false;
+      const lineDist =
+        Math.hypot(
+          state.selection.end.x - state.selection.start.x,
+          state.selection.end.y - state.selection.start.y,
+        )
+      const particleAmount = Math.round(lineDist * 4)
+      for (let i = 0; i < particleAmount; i++) {
+        const t = i / particleAmount;
+        const x =
+          state.wordSearchGrid.x +
+          state.selection.start.x * gridCellSize +
+          gridCellSize / 2 +
+          (state.selection.end.x - state.selection.start.x) * t * gridCellSize;
+        const y =
+          state.wordSearchGrid.y +
+          state.selection.start.y * gridCellSize +
+          gridCellSize / 2 +
+          (state.selection.end.y - state.selection.start.y) * t * gridCellSize;
+
+        Particles.addParticle(
+          state.particles,
+          x,
+          y,
+          (Math.random() - 0.5),
+          (Math.random() - 0.5),
+          1000, // lifetime
+        );
       }
     }
+    state.selection.selecting = false;
   }
 
   state.catBulletSpawnTimer += dt;
   const timePerCatBullet = 500 / catBulletConstants.spawnHz;
   while (state.catBulletSpawnTimer >= timePerCatBullet && state.playerAlive) {
     let xAxis = Math.random() > .5
-    let spawnX = 0
-    let spawnY = 0
+    let spawnX, spawnY = 0
     if (xAxis) {
       spawnX =
         Math.random() * state.enemyActiveArea.width +
@@ -244,6 +249,7 @@ export function draw(ctx: CanvasRenderingContext2D) {
     Math.sin(performance.now() * .033) * 10 * state.shakeAmount,
     Math.cos(performance.now() * .03) * 10 * state.shakeAmount,
   )
+
   {
     ctx.strokeStyle = textColor;
     ctx.textAlign = "center";
@@ -273,6 +279,11 @@ export function draw(ctx: CanvasRenderingContext2D) {
           ctx.restore()
           ctx.scale(1.2, 1.2)
         }
+        ctx.rotate(Math.sin((performance.now() + (x + y) * 100) * .003) * .1)
+        ctx.translate(
+          Math.sin((performance.now() + (x + y) * 100) * .005) * .25,
+          Math.cos((performance.now() + (x + y) * 100) * .005) * .25,
+        )
         ctx.fillText(
           letter, 0, 0
         );
@@ -345,18 +356,21 @@ export function draw(ctx: CanvasRenderingContext2D) {
       ctx.restore();
     }
 
-    ctx.textAlign = "left";
-    ctx.textBaseline = "top";
-    ctx.fillStyle = textColor;
-    const textToPrint = [...state.wordsToFind];
-    const margin = fontSize * .5;
-    for (let i = 0; i < textToPrint.length; i++) {
-      const word = textToPrint[i];
-      ctx.fillText(
-        word,
-        margin,
-        fontSize * i + margin,
-      );
+    if (state.gameStarted) {
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      ctx.fillStyle = textColor;
+      const textToPrint = [...state.wordsToFind];
+      const margin = fontSize * .5;
+      for (let i = 0; i < textToPrint.length; i++) {
+        const word = textToPrint[i];
+        ctx.fillText(
+          word,
+          margin,
+          fontSize * i + margin,
+        );
+      }
+
     }
 
 
@@ -369,6 +383,35 @@ export function draw(ctx: CanvasRenderingContext2D) {
       state.enemySpawnPerimeter.height,
     )
 
+    if (!state.gameStarted) {
+      ctx.fillStyle = backgroundColor;
+      ctx.fillRect(
+        state.enemySpawnPerimeter.x,
+        state.enemySpawnPerimeter.y,
+        state.enemySpawnPerimeter.width,
+        state.enemySpawnPerimeter.height,
+      )
+
+      ctx.fillStyle = textColor;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      const lines = [
+        "Find the words & dodge the cats!",
+        "Click to start",
+      ]
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        ctx.fillText(
+          line,
+          state.enemySpawnPerimeter.x + state.enemySpawnPerimeter.width / 2,
+          state.enemySpawnPerimeter.y + state.enemySpawnPerimeter.height / 2
+          + (i * fontSize * 1.5) - lines.length * fontSize / 2,
+        );
+      }
+
+    }
+
     {
       ctx.clip();
       ctx.textAlign = "center";
@@ -377,7 +420,9 @@ export function draw(ctx: CanvasRenderingContext2D) {
       state.catBullets.forEach((bullet) => {
         ctx.save()
         ctx.translate(bullet.x, bullet.y);
-        ctx.rotate(bullet.angle + Math.PI);
+        ctx.rotate(bullet.angle + Math.PI
+          + Math.sin(performance.now() * .01) * .2
+        );
         ctx.fillText('🐈‍⬛', 0, 0)
         ctx.restore()
       })
@@ -407,10 +452,13 @@ export function draw(ctx: CanvasRenderingContext2D) {
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.font = `${30}px ${font}`;
-    ctx.fillText(
-      "🐭",
+    ctx.translate(
       state.mouse.x,
       state.mouse.y,
+    )
+    ctx.rotate(Math.sin(performance.now() * .01) * .1);
+    ctx.fillText(
+      "🐭", 0, 0
     )
     ctx.restore()
 
@@ -423,7 +471,7 @@ export function draw(ctx: CanvasRenderingContext2D) {
       ctx.textBaseline = "middle";
       ctx.fillStyle = textColor;
       ctx.fillText(
-        "Congratulations!, Click to play again",
+        "Congratulations! Click to play again",
         state.canvasRect.width / 2,
         state.canvasRect.height / 2,
       );
@@ -440,7 +488,7 @@ export function draw(ctx: CanvasRenderingContext2D) {
       ctx.textBaseline = "middle";
       ctx.fillStyle = textColor;
       ctx.fillText(
-        "Game over! Click to play again",
+        "Game over! Click to try again",
         state.canvasRect.width / 2,
         state.canvasRect.height / 2,
       );

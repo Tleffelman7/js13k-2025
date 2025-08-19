@@ -1,7 +1,6 @@
 import "./style.css";
 import { state } from "./state.ts";
 import "./input.ts";
-import { gridSize, gridCellSize } from "./constants.ts";
 import { canvas } from "./dom.ts";
 import { update, draw } from "./game.ts";
 

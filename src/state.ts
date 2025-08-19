@@ -3,6 +3,8 @@ import * as Particles from "./particles";
 
 const wordSearchResult = generateWordSearch();
 const initState = {
+  gameStarted: false,
+
   grid: wordSearchResult.grid,
   wordsToFind: wordSearchResult.wordsUsed,
   mouse: {
